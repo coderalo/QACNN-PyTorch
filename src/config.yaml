@@ -8,8 +8,6 @@ train:
     epoch: 20
     batch_size: 16
     max_p_sent: 100
-    max_q_sent: 10
-    max_c_sent: 5
     max_p_seq_len: 20
-    max_q_seq_len: 20
-    max_c_seq_len: 15
+    max_q_seq_len: 50
+    max_c_seq_len: 30

@@ -114,10 +114,7 @@ def file_preprocess(filename, vocab):
             vocab.word.s2t(s)
             for s in re.split(pattern, QA[1])
             if s != '']
-        d['Q'] = [
-            vocab.word.s2t(s)
-            for s in re.split(pattern, QA[2])
-            if s != '']
+        d['Q'] = vocab.word.s2t(QA[2])
         d['C'] = \
             [
                 vocab.word.s2t(QA[3]),
