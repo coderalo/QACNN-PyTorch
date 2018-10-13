@@ -13,9 +13,12 @@ class Model:
         self._device = config.device
         self._logger.info("[*] Creating model.")
         self._stats = None
-
         self._net = Net(config)
-        self._optim = None
+        self._net.to(device=self._device)
+        optim = getattr(torch.optim, config.optim)
+        self._optim = optim(
+            filter(lambda p: p.requires_grad, self._net.parameters()),
+            **config.optim_param)
 
     def train(self):
         self._net.train()
@@ -75,4 +78,9 @@ class Model:
         self.load_state(ckpt_path)
 
     def compare(self, stats, best_stats):
-        pass
+        if best_stats is None:
+            return True
+        elif stats['ACC'] > best_stats['ACC']:
+            return True
+        else:
+            return False

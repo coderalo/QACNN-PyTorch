@@ -4,10 +4,9 @@ special_tokens: ['unk', 'pad']
 emb_dim: 100
 kernel_sizes: [1, 3, 5]
 output_channels: [128, 128, 128]
-train:
-    epoch: 20
-    batch_size: 16
-    max_p_sent: 100
-    max_p_seq_len: 20
-    max_q_seq_len: 50
-    max_c_seq_len: 30
+epoch: 20
+batch_size: 16
+p_sent: 100
+p_seq_len: 20
+q_seq_len: 50
+c_seq_len: 30
