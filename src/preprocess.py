@@ -110,18 +110,20 @@ def file_preprocess(filename, vocab):
     for QA in text:
         d = {}
         d['id'] = str(QA[0])
-        d['P'] = [
+        d['passage'] = [
             vocab.word.s2t(s)
             for s in re.split(pattern, QA[1])
             if s != '']
-        d['Q'] = vocab.word.s2t(QA[2])
-        d['C'] = \
+        d['question'] = vocab.word.s2t(QA[2])
+        d['choices'] = \
             [
                 vocab.word.s2t(QA[3]),
                 vocab.word.s2t(QA[4]),
                 vocab.word.s2t(QA[5]),
                 vocab.word.s2t(QA[6])
             ]
+        if len(QA) >= 8:
+            d['answer'] = int(re.findall('\d+', QA[7])[0]) - 1
         data.append(d)
     return data
 

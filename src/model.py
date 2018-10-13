@@ -8,12 +8,12 @@ from net import Net
 
 
 class Model:
-    def __init__(self, config):
+    def __init__(self, config, vocab):
         self._logger = create_logger(name="MODEL")
         self._device = config.device
         self._logger.info("[*] Creating model.")
         self._stats = None
-        self._net = Net(config)
+        self._net = Net(config, vocab)
         self._net.to(device=self._device)
         optim = getattr(torch.optim, config.optim)
         self._optim = optim(

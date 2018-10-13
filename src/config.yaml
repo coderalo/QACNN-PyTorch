@@ -1,12 +1,22 @@
 data_dir: ../data/
+embedding_dir: ../data/w2v_zh/
 vocab_size: 4000
 special_tokens: ['unk', 'pad']
 emb_dim: 100
 kernel_sizes: [1, 3, 5]
-output_channels: [128, 128, 128]
-epoch: 20
+output_channels: [32, 32, 32]
+epochs: 20
 batch_size: 16
+dropout: 0
 p_sent: 100
 p_seq_len: 20
 q_seq_len: 50
 c_seq_len: 30
+optim: "Adam"
+optim_param:
+    lr: 0.001
+    betas: [0.9, 0.999]
+exp: "test"
+random_seed: 7122
+device: 0
+test_ckpt: ../data/exp/test/ckpt/best.ckpt

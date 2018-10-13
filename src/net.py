@@ -6,9 +6,9 @@ from embedding import Embedding
 
 
 class Net(nn.Module):
-    def __init__(self, config):
-
-        self.embed = Embedding(config.vocab_size, config.emb_dim)
+    def __init__(self, config, vocab):
+        super(Net, self).__init__()
+        self.embed = Embedding(config, vocab)
 
         def gen_convs(in_channel, kernel_sizes, output_channels):
             return nn.ModuleList([
@@ -16,7 +16,7 @@ class Net(nn.Module):
                     in_channels=in_channel,
                     out_channels=oc,
                     kernel_size=kz,
-                    padding=((kz - 1) // 2, kz // 2))
+                    padding=((kz - 1) // 2))
                 for kz, oc in zip(kernel_sizes, output_channels)])
 
         full_size = sum(config.output_channels)
@@ -26,15 +26,15 @@ class Net(nn.Module):
             config.kernel_sizes,
             config.output_channels)
         self.convs_QR = gen_convs(
-            config.c_seq_len,
+            config.q_seq_len,
             config.kernel_sizes,
             config.output_channels)
         self.convs_CA = gen_convs(
-            config.emb_dim,
+            config.c_seq_len,
             config.kernel_sizes,
             config.output_channels)
         self.convs_CR = gen_convs(
-            config.emb_dim,
+            config.c_seq_len,
             config.kernel_sizes,
             config.output_channels)
         self.convs_PQ = gen_convs(
@@ -45,6 +45,12 @@ class Net(nn.Module):
             full_size,
             config.kernel_sizes,
             config.output_channels)
+        self.drop_QA = nn.Dropout(config.dropout)
+        self.drop_QR = nn.Dropout(config.dropout)
+        self.drop_CA = nn.Dropout(config.dropout)
+        self.drop_CR = nn.Dropout(config.dropout)
+        self.drop_PQ = nn.Dropout(config.dropout)
+        self.drop_PC = nn.Dropout(config.dropout)
         self.proj1 = nn.Linear(full_size, full_size)
         self.proj2 = nn.Linear(full_size, 1)
 
@@ -54,8 +60,8 @@ class Net(nn.Module):
         Q: B x L(Q)
         C: [B x L(Q)] x N(C)
         """
-        bs = passage.size(0)
-        ps = passage.size(1)
+        bs = p.size(0)
+        ps = p.size(1)
         pl = p.size(2)
         cl = cs[0].size(1)
 
@@ -63,10 +69,9 @@ class Net(nn.Module):
         p_emb = self.embed(p_flat)
         q_emb = self.embed(q)
         c_embs = [self.embed(c) for c in cs]
-        p_norm = p_emb / p_emb.norm(dim=-1)[:, None]
-        q_norm = q_emb / q_emb.norm(dim=-1)[:, None]
-        c_norms = \
-            [c_emb / c_emb.norm(dim=-1)[:, None] for c_emb in c_embs]
+        p_norm = p_emb / p_emb.norm(dim=-1)[:, :, None]
+        q_norm = q_emb / q_emb.norm(dim=-1)[:, :, None]
+        c_norms = [c_emb / c_emb.norm(dim=-1)[:, :, None] for c_emb in c_embs]
 
         # Calculate the similarity matrices
         mat_pq = torch.matmul(p_norm, q_norm.permute(0, 2, 1))
@@ -80,28 +85,33 @@ class Net(nn.Module):
         def conv_op(I, convs):
             return torch.cat([conv(I) for conv in convs], dim=1)
         # Stage 1 attention
-        qa = F.sigmoid(torch.max(
-                conv_op(mat_pq, self.convs_QA),
-                dim=-1)[0].unsqueeze(-1))
-        qr = F.relu(conv_op(mat_pq, self.convs_QR))
-        qr = torch.max(qr * qa, dim=1)[0].reshape(bs, ps, -1).permute(0, 2, 1)
-        cas = [
-            F.sigmoid(torch.max(
-                conv_op(mat_pc, self.convs_CA),
-                dim=-1)[0].unsqueeze(-1))
-            for mat_pc in mat_pcs]
-        crs = [F.relu(conv_op(mat_pc, self.convs_CR)) for mat_pc in mat_pcs]
-        crs = [
-                torch.max(cr * ca, dim=1)[0]
-                .reshape(bs, ps, -1).permute(0, 2, 1)
-                for cr, ca in zip(crs, cas)]
-        # Stage 2 attention
-        pq = F.sigmoid(torch.max(
-                conv_op(qr, self.convs_PQ),
-                dim=-1)[0].unsqueeze(-1))
-        pcs = [F.relu(conv_op(cr, self.convs_PC)) for cr in crs]
-        pcs = torch.stack([torch.max(pq * pc, dim=1)[0] for pc in pcs], dim=1)
+        qa = torch.max(conv_op(mat_pq, self.convs_QA), dim=-1)[0].unsqueeze(-1)
+        qa = self.drop_QA(F.sigmoid(qa))
 
-        logits = F.softmax(self.proj2(F.tanh(self.proj1(pcs))).squeeze(-1))
+        qr = self.drop_QR(F.relu(conv_op(mat_pq, self.convs_QR)))
+        qr = torch.max(qr * qa, dim=2)[0].reshape(bs, ps, -1).permute(0, 2, 1)
+
+        cas = [
+            torch.max(conv_op(mat_pc, self.convs_CA), dim=-1)[0].unsqueeze(-1)
+            for mat_pc in mat_pcs]
+        cas = [self.drop_CA(F.sigmoid(ca)) for ca in cas]
+
+        crs = [
+            self.drop_CR(F.relu(conv_op(mat_pc, self.convs_CR)))
+            for mat_pc in mat_pcs]
+        crs = [
+            torch.max(cr * ca, dim=2)[0].reshape(bs, ps, -1).permute(0, 2, 1)
+            for cr, ca in zip(crs, cas)]
+
+        # Stage 2 attention
+        pq = torch.max(conv_op(qr, self.convs_PQ), dim=-1)[0].unsqueeze(-1)
+        pq = self.drop_PQ(F.sigmoid(pq))
+
+        pcs = [self.drop_PC(F.relu(conv_op(cr, self.convs_PC))) for cr in crs]
+        pcs = torch.stack([torch.max(pq * pc, dim=2)[0] for pc in pcs], dim=1)
+
+        logits = F.softmax(
+            self.proj2(F.tanh(self.proj1(pcs))).squeeze(-1),
+            dim=-1)
 
         return logits
