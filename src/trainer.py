@@ -114,6 +114,7 @@ class Trainer:
                 labels=batch['answer'])
             self.model.zero_grad()
             metrics[1].backward()
+            metrics[1] = metrics[1].item()
             if hasattr(self, "max_grad_norm"):
                 self.model.clip_grad(self.max_grad_norm)
             self.model.update()

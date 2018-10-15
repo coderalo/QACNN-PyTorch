@@ -38,6 +38,7 @@ class Embedding(nn.Module):
                     f"({cover / vocab_size * 100:.2f}%)."))
             else:
                 logger.info("[-] Match file not found. Train from scratch.")
+                self.model = nn.Embedding(vocab_size, config.emb_dim)
         else:
             self.model = nn.Embedding(vocab_size, config.emb_dim)
             logger.info("[-] Train from scratch.")
