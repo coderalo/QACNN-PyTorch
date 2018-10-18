@@ -71,10 +71,10 @@ class Model:
             for k, v in state.items():
                 if torch.is_tensor(v):
                     state[k] = v.to(device=self._device)
-        print(f"[-] Model loaded from {ckpt_path}.")
+        self._logger.info(f"[-] Model loaded from {ckpt_path}.")
 
     def load_best_state(self, ckpt_dir):
-        ckpt_path = ckpt_dir / 'best.ckpt'
+        ckpt_path = ckpt_dir / 'ckpt' / 'best.ckpt'
         self.load_state(ckpt_path)
 
     def compare(self, stats, best_stats):

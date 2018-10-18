@@ -80,10 +80,18 @@ def main(config_path, output_file):
             batch['passage'], batch['question'], batch['choices'])
         _, predictions = torch.max(logits, dim=-1)
         predictions = predictions.tolist()
-        for ID, pred in zip(batch['id'], predictions):
+        for idx, (ID, pred) in enumerate(zip(batch['id'], predictions)):
+            question = batch['question'][idx].tolist()
+            if vocab.word.pad in question:
+                question = question[:question.index(vocab.word.pad)]
+            answer = batch['choices'][pred-1][idx].tolist()
+            if vocab.word.pad in answer:
+                answer = answer[:answer.index(vocab.word.pad)]
             writer.writerow({
                 'id': ID,
                 'ans': int(pred)+1})
+            print(f"Question: {''.join(vocab.word.t2s(question))}")
+            print(f"Answer: {''.join(vocab.word.t2s(answer))}")
 
 
 if __name__ == "__main__":

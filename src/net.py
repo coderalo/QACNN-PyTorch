@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from embedding import Embedding
 
@@ -86,18 +85,18 @@ class Net(nn.Module):
             return torch.cat([conv(I) for conv in convs], dim=1)
         # Stage 1 attention
         qa = torch.max(conv_op(mat_pq, self.convs_QA), dim=-1)[0].unsqueeze(-1)
-        qa = self.drop_QA(F.sigmoid(qa))
+        qa = self.drop_QA(torch.sigmoid(qa))
 
-        qr = self.drop_QR(F.relu(conv_op(mat_pq, self.convs_QR)))
+        qr = self.drop_QR(torch.relu(conv_op(mat_pq, self.convs_QR)))
         qr = torch.max(qr * qa, dim=2)[0].reshape(bs, ps, -1).permute(0, 2, 1)
 
         cas = [
             torch.max(conv_op(mat_pc, self.convs_CA), dim=-1)[0].unsqueeze(-1)
             for mat_pc in mat_pcs]
-        cas = [self.drop_CA(F.sigmoid(ca)) for ca in cas]
+        cas = [self.drop_CA(torch.sigmoid(ca)) for ca in cas]
 
         crs = [
-            self.drop_CR(F.relu(conv_op(mat_pc, self.convs_CR)))
+            self.drop_CR(torch.relu(conv_op(mat_pc, self.convs_CR)))
             for mat_pc in mat_pcs]
         crs = [
             torch.max(cr * ca, dim=2)[0].reshape(bs, ps, -1).permute(0, 2, 1)
@@ -105,13 +104,14 @@ class Net(nn.Module):
 
         # Stage 2 attention
         pq = torch.max(conv_op(qr, self.convs_PQ), dim=-1)[0].unsqueeze(-1)
-        pq = self.drop_PQ(F.sigmoid(pq))
+        pq = self.drop_PQ(torch.sigmoid(pq))
 
-        pcs = [self.drop_PC(F.relu(conv_op(cr, self.convs_PC))) for cr in crs]
+        pcs = [
+            self.drop_PC(torch.relu(conv_op(cr, self.convs_PC))) for cr in crs]
         pcs = torch.stack([torch.max(pq * pc, dim=2)[0] for pc in pcs], dim=1)
 
-        logits = F.softmax(
-            self.proj2(F.tanh(self.proj1(pcs))).squeeze(-1),
+        logits = torch.softmax(
+            self.proj2(torch.tanh(self.proj1(pcs))).squeeze(-1),
             dim=-1)
 
         return logits
