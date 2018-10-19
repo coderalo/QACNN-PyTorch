@@ -35,7 +35,7 @@ def preprocess(config):
     logger.info("[*] Start pre-parsing file.")
 
     for filename in train_files + val_files + test_files:
-        file_preparse(filename)
+        file_preparse(filename, config.use_punct)
 
     vocab_path = save_dir / "vocab.pkl"
 
@@ -53,7 +53,7 @@ def preprocess(config):
 
     train_path = save_dir / f"train.pkl"
     train_data = [
-        file_preprocess(filename, vocab)
+        file_preprocess(filename, vocab, config.use_punct, config.p_seq_len)
         for filename in tqdm(train_files, desc='TRAIN', leave=False)]
     train_data = reduce(add, train_data)
     pickle.dump(train_data, train_path.open('wb'))
@@ -61,7 +61,7 @@ def preprocess(config):
 
     val_path = save_dir / "valid.pkl"
     val_data = [
-        file_preprocess(filename, vocab)
+        file_preprocess(filename, vocab, config.use_punct, config.p_seq_len)
         for filename in tqdm(val_files, desc='VALID', leave=False)]
     val_data = reduce(add, val_data)
     pickle.dump(val_data, val_path.open('wb'))
@@ -69,14 +69,14 @@ def preprocess(config):
 
     test_path = save_dir / "test.pkl"
     test_data = [
-        file_preprocess(filename, vocab)
+        file_preprocess(filename, vocab, config.use_punct, config.p_seq_len)
         for filename in tqdm(test_files, desc='TEST ', leave=False)]
     test_data = reduce(add, test_data)
     pickle.dump(test_data, test_path.open('wb'))
     logger.info(f"[-] Write processed test data to {test_path}.")
 
 
-def file_preparse(filename):
+def file_preparse(filename, use_punct):
     with codecs.open(filename, 'r', encoding='utf-8') as file:
         reader = csv.reader(file)
         header = next(reader)
@@ -88,9 +88,22 @@ def file_preparse(filename):
             s = re.sub("[\t\n 　]", '', s)
             s = re.sub("[~～]?((tape)|(TAPE))", '', s)
             s = re.sub("~VOICE", '', s)
-            pattern = \
-                u"[\u4e00-\u9fff，。！？：（）!:,「」、“”.《》?%();；﹐﹑％]+"
-            s = 'U'.join(re.findall(pattern, s))
+            if use_punct is True:
+                pattern = \
+                    (
+                        u"[\u4e00-\u9fff"
+                        u"，。！？：（）!:,「」、“”.《》?%();；﹐﹑％]+"
+                    )
+                s = 'U'.join(re.findall(pattern, s))
+            else:
+                pattern1 = \
+                    (
+                        u"[\u4e00-\u9fff"
+                        u"，。！？：（）!:,「」、“”.《》?%();；﹐﹑％]+"
+                    )
+                s = 'U'.join(re.findall(pattern1, s))
+                pattern2 = u"[\u4e00-\u9fff]+"
+                s = ''.join(re.findall(pattern2, s))
             data[i][j+1] = s
 
     with codecs.open(filename + ".filter", 'w', encoding='utf-8') as file:
@@ -100,7 +113,7 @@ def file_preparse(filename):
             writer.writerow(d)
 
 
-def file_preprocess(filename, vocab):
+def file_preprocess(filename, vocab, use_punct, p_seq_len):
     with codecs.open(filename, 'r', encoding='utf-8') as file:
         reader = csv.reader(file)
         next(reader, None)
@@ -110,10 +123,15 @@ def file_preprocess(filename, vocab):
     for QA in text:
         d = {}
         d['id'] = str(QA[0])
-        d['passage'] = [
-            vocab.word.s2t(s)
-            for s in re.split(pattern, QA[1])
-            if s != '']
+        if use_punct is True:
+            d['passage'] = [
+                vocab.word.s2t(s)
+                for s in re.split(pattern, QA[1])
+                if s != '']
+        else:
+            d['passage'] = [
+                vocab.word.s2t(QA[1][idx*p_seq_len: (idx+1)*p_seq_len])
+                for idx in range(len(QA[1]) // p_seq_len + 1)]
         d['question'] = vocab.word.s2t(QA[2])
         d['choices'] = \
             [

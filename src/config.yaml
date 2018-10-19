@@ -1,10 +1,11 @@
 data_dir: ../data/
-embedding_dir: ../data/w2v_zh/
+embedding_dir: /home/coderalo/w2v_zh/
 vocab_size: 4000
+use_punct: False
 special_tokens: ['unk', 'pad']
 emb_dim: 100
 kernel_sizes: [1, 3, 5]
-output_channels: [32, 32, 32]
+output_channels: [128, 128, 128]
 epochs: 20
 batch_size: 16
 dropout: 0
@@ -16,7 +17,6 @@ optim: "Adam"
 optim_param:
     lr: 0.001
     betas: [0.9, 0.999]
-exp: "test"
+exp: "config0:exp1:oc=128:drp=0:ps=100:pl=20:ql=50:cl=30"
 random_seed: 7122
 device: 0
-test_ckpt: ../data/exp/test/ckpt/best.ckpt
